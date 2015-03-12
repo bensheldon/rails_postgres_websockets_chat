@@ -8,7 +8,8 @@ require 'erb'
 
 class AsyncEvents
   KEEPALIVE_TIME = 1 # in seconds
-  CHANNEL = "chatdemo"
+  CHANNEL = 'chatdemo'
+  RESET_CHANNEL = 'pg_restart'
 
   def initialize(app)
     @app     = app
@@ -56,11 +57,16 @@ class AsyncEvents
           ActiveRecord::Base.connection_pool.with_connection do |connection|
             conn = connection.instance_variable_get(:@connection)
             begin
+              conn.async_exec "LISTEN #{RESET_CHANNEL}"
               conn.async_exec "LISTEN #{CHANNEL}"
-              loop do
-                conn.wait_for_notify do |channel, pid, payload|
-                  p [:send, payload]
-                  @clients.each {|ws| ws.send(sanitize payload) }
+              catch(:break_loop) do
+                loop do
+                  conn.wait_for_notify do |channel, pid, payload|
+                    p [:send, channel, payload]
+                    # Break out of the loop if receive a restart (like on Rails reload)
+                    throw :break_loop if channel == RESET_CHANNEL
+                    @clients.each {|ws| ws.send(sanitize payload) }
+                  end
                 end
               end
             rescue => error
@@ -70,7 +76,6 @@ class AsyncEvents
               # it to the pool - could result in weird behavior for the next
               # thread to check it out.
               conn.async_exec "UNLISTEN *"
-              p [:unlisten]
             end
           end
           @bgthread = false
