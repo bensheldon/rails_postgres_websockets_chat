@@ -1,0 +1,9 @@
+{
+  "name": "rails-postgres-websockets-chat",
+  "description": "A simple async Rails chat server using postgres listen/notify",
+  "website": "https://github.com/bensheldon/rails_postgres_websockets_chat",
+  "success_url": "/",
+  "addons": ["heroku-postgresql"],
+  "env": {},
+  "scripts": {}
+}
